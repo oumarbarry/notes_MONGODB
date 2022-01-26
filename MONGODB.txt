@@ -1,0 +1,1381 @@
+Introduction:
+	What is MongoDB:
+		it's simply a NoSQL document-oriented DBMS
+		mongo is stemming from the word Humongous because it can store/handle lots and lots of data
+
+		behind the scenes, on the server, mongoDB converts our given JSON data to a binary version of it (BSON) which can be stored and queried more efficiently
+
+	The Key MongoDB Characteristics: No Schema, No/Few Relations
+
+	THE MONGODB ECOSYSTEM:
+		MongoDB Database:
+			MongoDB Server: Community (Self-Managed) / Enterprise
+ 			Atlas (Cloud)
+			Mobile
+			Compass
+			BI Connectors, MongoDB Charts
+		Stitch: 
+			Serverless Query API, Serverless Functions, Database Triggers, Real-Time Sync
+
+	Installing MongoDB...
+
+	Shell to Drivers (or how to use mongoDB pair with a programming language):
+		docs.mongodb.com -> MongoDB Drivers: Python, Node.js, etc
+
+	Working with MongoDB:
+		Shell(for Playground, Administration Tasks...) + Data Layer
+			and/or
+		Application + Data Layer:
+			Application: 
+				Frontend(SPA/SSR/Mobile) ++ Backend+Drivers(Python, Node)
+			Data Layer: 
+				MongoDB Server --> communicates with 
+					 the Storage Engine(WIRED TIGER for mongo) that
+						--> Read+Write some Data to Memory
+						--> and at the end of the day Read+Write Data to Files
+
+	Course Outline:
+		Introduction
+		Basics & Basic CRUD
+		Data Schema & Relations
+		Working with the Shell
+		Using Compass
+		CRUD Deep Dive
+		Using Indexes
+		Working with Geospatial Data
+		The Aggregation Framework
+		Working with Numeric Data
+		Security & Authentication
+		Performance, Fault Tolerance & Deployment
+		Transactions
+		From Shell to Drivers
+		MongoDB Stitch
+
+	How to get the most out of the course:
+		Watch the videos at your pace
+		Pause & Code Along: Active > Passive
+		Do the assignments
+		Dive into the office docs + Google : Learn to solve problems by yourself
+
+
+Basics & CRUD Basic:
+	show dbs
+	use flights
+	db.dropDatabase()
+	db.flightData.insertOne({<JSON data>})
+	db.flightData.find().pretty
+
+	JSON vs BSON:
+		BSON (Binary JSON) is the binary version of JSON Data, use for Efficient Storage by MongoDB
+			it extends JSON Types (with more detailed Number types like ObjectId())
+
+	CRUD Operations:
+		CREATE:
+			insertOne(data, options)
+			insertMany(data, options)
+		READ:
+			find(filter, options)
+			findOne(filter, options)
+		UPDATE:
+			updateOne(filter, data, options)
+			updateMany(filter, data, options)
+			replaceOne(filter, data, options)
+		Delete:
+			deleteOne(filter, options)
+			deleteMany(filter, options)
+
+	mongo:
+		db.flightData.updateOne({distance: 1200}, {$set: {marker: 'delete'}})
+		db.flightData.updateMany({}, {$set: {marker: 'toDelete'}}) //will update all documents
+
+		db.flightData.deleteOne({distance: 12000})
+		db.flightData.deleteMany({})
+		db.flightData.deleteMany({marker: "toDelete"})
+
+		db.flightData.insertMany([{..}, {..}])
+
+		db.flightData.find({distance: {$gt: 10000}})
+		db.flightData.findOne({distance: {$gt: 500}})
+
+	update vs updateMany:
+		WARNING with update()
+			db.flightData.update({distance: 950}, {$set: {delayed: true}})
+
+			db.flightData.update({distance: 950}, {delayed: true}) //act like replaceOne()
+
+			db.flightData.replace0ne({distance: 950}, {aircraft: 'Airbus', distance: 950}) //BETTER
+
+	find & the Cursor Object:
+		find() don't return all the documents inside a collection
+			instead it gives a Cursor Object that we can cycle throught 
+				as the shell that happens to take that cursor 
+					and gives us the first 20 documents by default
+						then give us the 'it' command to see the next 20 available documents
+			
+			we can also cycle throught the cursor with:
+				db.passengers.find().toArray()
+				db.passengers.find().forEach((data)=> {printjson(data)})
+
+	Projection:
+		db.passengers.find({}, {name:1, _id:0})
+
+	Embedded Documents:
+		we can't have UP TO 100 LEVELS OF NESTED DOCUMENTS
+		MAX 16MB / DOCUMENTS
+	Arrays:
+		we can have array of embedded documents as array can hold any data
+
+	Accessing Structured Data:
+		arrays:
+			db.passengers.findOne({name: 'Oumar Barry'}).hobbies
+			db.passengers.find({hobbies: "anime"})
+		embedded documents:
+			db.flightData.find({"status.description": "offline"})
+
+
+Schema & Relations (or How to Structure Documents):
+	Schema-less or Not ?
+		mongoDB enforces NO SCHEMAS
+			but that doesn't mean that you can't/must not use some kind of schema
+
+	Structuring Documents:
+		----			Chaos -->		 Middle --> 	SQL World
+		Schema: Very Different  --> Extra Data --> Full Equality
+
+	Data Types:
+		Text: 'Oumar' Boolean: true
+		Number:
+			Integer (int32)
+			NumberLong (int64)
+			Floating Point Number
+			Number Decimal (decimal precison up to 34 numbers)
+		ObjectId: ObjectId('jskdssdj763')
+		ISODate: ISODate("2018-09-09T14:30:45.757Z")
+		Timestamp: Timestamp(1138393, 1)
+		Embedded Document: {a: {...}}
+		Array: {c: [...]}
+
+	datatypes in action:
+		NB: the shell is written in JS, so it provides us an API in JS
+			by example, numbers type is store 
+				as floating 64-bit number as JS doesn't differentiate integers and floats
+
+		cmd:
+			db.companies.insertOne({
+				name: 'Fresh Inc', isStartup: true, employees: NumberInt(33),
+				funding: 1234567890123456789, fundingDate: new Date(), 
+				details: {ceo: ['Alex Sun', 'Marc Moon']}, insertedAt: new Timestamp()
+			})
+			typeof db.companies.findOne().employees
+			db.stats()
+			db.companies.drop()
+
+	How to Derive your Data Structure - Requirements:
+		such questions to ask to yourself:
+			Which data does my App need or generate ? 
+				--> Defines the fields you'll need (and how they relate)
+			Where do i need my data ?
+				--> Defines your required collections + field grouping
+			Which kind of data or information do i want to display ?
+				--> Defines which queries you'll need
+			How ofthen do i fetch or (do i write or change) my data ?
+				--> Defines wheter and so what you should optimize queries
+
+	Relations Options:
+		Nested Documents:
+			group data together logically
+			great or data that belongs together is not really overlapping with other data
+			avoid super-deep nesting or extremely long arrays (the 16mb size limit per document)
+	
+		Referenced Documents (generally by the _id):
+			split data across collections
+			great for related/shared data as well as for data which is used in relations and standalone
+			allows us to overcome nesting and size limit
+
+	One-to-One Relations:
+		Embedded: for many, or most one-to-one relationships like Patient-DiseaseSummary relations
+		Referencing: usually only if it's a requirement maybe for analytical usecase
+
+	One-to-Many Relations:
+		Referencing : better
+			example: City-Citizens
+		Embedded: good too if nested data will not up the document to 16MB in the future
+			example: Thread-Answers
+
+	Many-to-Many Relations:
+		Embedded: like Customers (Orders) - Products
+		Referencing: (most usually used) like Bookd-Authors
+
+	'$lookup' for merging reference relations:
+		db.books.aggregate([{$lookup: {
+			from: authors, localField: "myAuthorsID", foreignField: "_id", as: "myWriters"
+		}}])
+
+	Schema Validation:
+		validationLevel:
+			strict: checks all inserts & all updates
+			moderate: all inserts but only update the correct documents
+		validationAction:
+			error: throw error and deny insert/update
+			warn: log warning but proceed
+
+		syntax:
+			when creating the collection:
+				db.createCollection('posts', {
+					validator: {
+						$jsonSchema: {
+							bsonType: 'object',
+							required: ['title', 'text', 'creator', 'comments'],
+							properties: {
+								title: {
+									bsonType: 'string',
+									description: 'must be a string and is required'
+								},
+								text: {
+									bsonType: 'string',
+									description: 'must be a string and is required'
+								},
+								creator: {
+									bsonType: 'objectId',
+									description: 'must be an objectid and is required'
+								},
+								comments: {
+									bsonType: 'array',
+									description: 'must be an array and is required',
+									items: {
+										bsonType: 'object',
+										required: ['text', 'author'],
+										properties: {
+											text: {
+												bsonType: 'string',
+												description: 'must be a string and is required'
+											},
+											author: {
+												bsonType: 'objectId',
+												description: 'must be an objectid and is required'
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				});
+
+			once the collection is created and that you want to modify the schema validation:
+				db.runCommand({
+					collMod: 'posts',
+					validator: {
+						$jsonSchema: {
+							bsonType: 'object',
+							required: ['title', 'text', 'creator', 'comments'],
+							properties: {
+								title: {
+									bsonType: 'string',
+									description: 'must be a string and is required'
+								},
+								text: {
+									bsonType: 'string',
+									description: 'must be a string and is required'
+								},
+								creator: {
+									bsonType: 'objectId',
+									description: 'must be an objectid and is required'
+								},
+								comments: {
+									bsonType: 'array',
+									description: 'must be an array and is required',
+									items: {
+										bsonType: 'object',
+										required: ['text', 'author'],
+										properties: {
+											text: {
+												bsonType: 'string',
+												description: 'must be a string and is required'
+											},
+											author: {
+												bsonType: 'objectId',
+												description: 'must be an objectid and is required'
+											}
+										}
+									}
+								}
+							}
+						}
+					},
+					validationAction: 'warn'
+				});
+
+	Helpful Articles/ Docs:
+		The MongoDB Limits: https://docs.mongodb.com/manual/reference/limits/
+		The MongoDB Data Types: https://docs.mongodb.com/manual/reference/bson-types/
+		More on Schema Validation: https://docs.mongodb.com/manual/core/schema-validation/
+
+
+Exploring the Shell & the Server:
+	Finding Available Options:
+		to docs.mongodb.com
+		mongod --help
+
+	Setting dbpath & logpath:
+		mongod --dbpath $MONGO_DATA --logpath $MONGO_LOG/oumar.log
+
+	Running MongoDB as a Background Service:
+		unix-based:
+			start: mongod --fork --logpath $MONGO_LOG/oumar.log
+			end:
+				use admin
+				db.shutdownServer()
+				then Ctrl+C
+
+		on windows:
+			net start MongoDB
+			net stop MongoDB
+
+	Using a config file: mongo.cfg
+
+	Shell Options & Help:
+		mongo --help
+		mongo //inside the mongo shell client, type:
+			help
+				use testDB
+				db.help()
+				db.testColl.help()
+
+
+Using MongoDB Compass to Explore Data Visually
+
+
+CRUD DEEP DIVE:
+	CREATE:
+		Creating Documents:
+			insertOne()
+			insertMany()
+			insert()
+			mongoimport
+
+		Ordered Inserts:
+			db.hobbies.insertMany([{..doc1}, {..doc2}], {ordered: false})
+
+				with ordered=false, 
+					if the insert of doc1 fails due to error (duplicate error per example),
+						the default behaviour being to cancel the insert of the following documents,
+							now it will continue and insert doc2 if possible
+
+		writeConcern:
+			we can control the 'level of guarantee' 
+				when data is stored with the writeConcern option available on all CRUD operations
+
+			cmd:
+				db.persons.insertOne({name: 'Chrissy', age: 41}, {writeConcern: {w: 0}} )
+					with w=0, mongod will not acknowlegde if the current operation is done or not
+
+				db.persons.insertOne({name: 'Ali'}, {writeConcern: {w: 1, j: true}} )
+					by default when unspecified, j=false/undefined
+						so with j=true, 
+							we specify that this operation should be firstly write 
+								in the journal to-do list of the storage engine 
+									before being apply in database files,
+							this add an extra-layer of security, 
+								so then if the server shutdown during the operation, 
+									when restarted, 
+										it will retrieve what it was doing throught this journal
+
+				db.persons.insertOne({name: 'DD'}, {writeConcern: {w: 1, j: true, wtimeout: 200}} )
+					with wtimeout: 200, 
+						we specify that after 200ms if the operation hasn't be done, throw an error
+
+		What is 'Atomicity' ?
+			MongoDB CRUD Operations are Atomic on the Document Level
+				it means that per example 
+					when an 'insertOne' operation is successful, the document is save as a Whole
+						but when an error is throw, mongodb rolls back the operation, nothing is saved
+
+		mongoimport:
+			mongoimport --file=contacts.json -d=users_db -c=contacts_coll --drop --jsonArray
+			mongoimport -d=seriesDB -c=series --file=tv-shows.json --drop --jsonArray
+
+
+	READ:
+		Operators:
+			Read: Query & Projection Operators
+			Update: Fields, Arrays
+			Query Modifiers (DEPRECATED)
+			Aggregation: Pipeline Stages & Pipeline Operators
+
+		Query Selectors & Projection Operators:
+			Query Selectors:
+				Comparison, Logical, Element, Evaluation, Array, Comments, Geospatial
+			Projection Operators:
+				$, $elemMatch, $meta, $slice
+
+		Querying Embedded Fields & Arrays:
+			Embedded Documents:
+				db.series.find({"rating.average": {$gt: 7}}).pretty()
+			Arrays:
+				db.series.find({genres: "Drama" }).pretty()
+				db.series.find({genres: ["Drama"] }).pretty()
+
+				db.users.find({"hobbies.title": "Sports"}).pretty()
+					//even 'title' is a field of multiple embedded document in the hobbies's Array,
+						mongodb is enough smart to loop throught the entire array of embedded document
+							and check match for the specified condition
+
+		Comparison Operators:
+			$eq, $ne, $gt, $gte, $in, $nin, $lt, $lte
+
+			$eq, $ne, etc:
+				db.series.find({runtime: {$eq: 60}}).pretty() //== db.series.find({runtime: 60})
+				db.series.find({runtime: {$ne: 60}}).pretty()
+				db.series.find({runtime: {$lt: 60}}).pretty()
+
+			$in and $nin:
+				db.series.find({runtime: {$in: [30, 42]}}).pretty()
+				db.series.find({runtime: {$nin: [30, 42]}}).pretty()
+
+		Logical Operators:
+			$or and $nor:
+				db.series.find({$or: [
+					{"rating.average": {$lt: 5}}, 
+					{"rating.average": {$gt: 9.3}
+				}]}).count()
+
+			$and:
+				both of these two case are good:
+					db.series.find({$and: [{"rating.average": {$gt: 9}}, {genres: "Drama"}]}).pretty()
+					=== db.series.find({"rating.average": {$gt: 9}, genres: "Drama"}).pretty()
+				
+				but when it comes to compare against the same field more than twice, always use $and:
+					db.series.find({$and: [{genres: "Drama"}, {genres: "Horror"}]}).count()
+
+			$not:
+				db.series.find({runtime: {$not: {$eq: 60}}}) === db.series.find({runtime: {$ne: 60}})
+
+		Element Operators:
+			$exists:
+				db.users.find( {age: {$exists: false}} ).pretty()
+				db.users.find( {age: {$exists: true, $ne: null}} ).pretty()
+
+			$type:
+				db.users.find( {phone: {$type: "number"}} ).pretty()
+				db.users.find( {phone: {$type: ["string", "number"] }} ).pretty()
+
+		Evaluation Operators:
+			$jsonSchema, $mod (modulo), $text, $regex, $where (deprecated and replace by $expr)
+
+			$regex:
+				db.series.find({ summary: {$regex: /musical/} })
+
+			$expr:
+				use financialData
+				db.series.find({$expr: { <expression> }}) //look at docs for the list of expression
+
+				db.series.find({$expr: {$gt: ['$volume', '$target']}}).pretty()
+					//return all documents where the volume is greater than the target
+
+				db.series.find({$expr: {$gt: [ 
+					{$cond: { $if: {$gte: ['$volume', 190]}, 
+						then: {$substract: ['$volume', 30]}, 
+							else: '$volume' }}, 
+					'$target' 
+				]}})
+
+		Array Operators:
+			$size:
+				db.users.find({ hobbies: {$size: 3} }).pretty()
+					//find all docs where the hobbies Array contains 3 items
+					// $size only check for equality
+
+			$all:
+				db.series.find({genres: {$all: ['Thriller', 'Drama']}}).pretty()
+					//find all docs that contains all of the specifies items, no matter their order
+
+			$elemMatch:
+				db.users.find({hobbies: {$elemMatch: { title: 'Sports', frequency: {$gte: 3} }}})
+					//find all docs where title=Sports and frequency is $gte than 3 in the same embedded docs of the hobbies array
+
+		Cursors:
+			let cursor = db.series.find()
+			cursor.next() //to load the next document in the cursor
+			cursor.hasNext() //retrieve false if the cursor has release all documents
+
+			cursor.forEach( doc => printjson(doc) )
+
+			Sorting, Skipping & Limiting:
+				db.series.find().sort({"rating.average": 1, runtime: -1}) //-1: DESC, 1: ASC
+
+				db.series.find().skip(100).limit(10)
+
+		Projection:
+			db.series.find({}, {_id: 0, name: 1, genres: 1, runtime: 1, rating: 1, "schedule.time": 1})
+
+			Projection in Arrays:
+				db.series.find({genres: 'Drama'}, {"genres.$": 1}).pretty()
+					//retrieve all docs with only the genre field array 
+						with only items THAT match the filter result, here 'Drama'
+
+				db.series.find({genres: {$all: ['Drama', 'Horror']}}, {"genres.$":1}).pretty()
+					//will retrieve genres with only 'Horror' as items
+				db.series.find({genres: {$all: ['Horror', 'Drama']}}, {"genres.$":1}).pretty()
+					//will retrieve genres with only 'Drama' as items
+
+				db.series.find({genres: 'Drama'}, {genres: {$elemMatch: {$eq: 'Horror'}} }).pretty()
+
+				db.series.find({"rating.average": {$gt: 9}}, {genres: {$elemMatch: {$eq: 'Horror'}}})
+					only display the genres array field if it contains 'Horror'
+						and only display the 'Horror' items in it
+
+			$slice:
+				db.series.find({"rating.average": {$gt: 9}}, {name: 1, genres: {$slice: 2})
+					retrieve docs with only the first two items of the 'genres' array
+
+				db.series.find({"rating.average": {$gt: 9}}, {name: 1, genres: {$slice: [1, 2]}})
+					//retrieve all docs, where the rating is greater than,
+						with only the second(1) and third(2) items of the 'genres' array 
+
+
+	UPDATE:
+		reminder:
+			use userDB
+			db.users.updateOne({name: 'Chrisssy'}, 
+				{ $set: {hobbies: [{title: 'Sports'}, {title: 'Cooking'}]} })
+			db.users.updateMany({"hobbies.title": 'Sports'}, {$set: {isSporty: true}})
+			db.users.updateOne({name: 'Chrisssy'}}, {$set: {age: 40, phone: 81939271}})
+
+		Updating Fields:
+			$inc:
+				db.users.updateOne({name: 'Manuel'}, { $inc: {age: 2}, $set: {isSporty: false} })
+				db.users.updateOne({name: 'Manuel'}, { $inc: {age: -1} }) //negative value to decrement
+
+			$min, $max, $mul(mutiply):
+				db.users.updateOne({name: 'Manuel'}, {$min: {age: 35}})
+					//if the new age is lower than the current age, then replace the old by the new
+
+				db.users.updateOne({name: 'Manuel'}, {$max: {age: 50}})
+					//if the new age is greater than the current age
+
+				db.users.updateOne({name: 'Manuel'}, {$mul: {age: 2}})
+					//multiply the age by 2
+
+			$unset (or how to get rid of a field)
+				db.users.updateOne({isSporty: true}, {$unset: {phone: ''}})
+
+			$rename:
+				db.users.updateOne({}, {$rename: {age: 'totalAge'}})
+					rename the 'age' field by 'totalAge'
+
+		$upsert (update if checked document exists otherwised insert it):
+			db.users.updateOne({name: 'Maria'}, {$set: {age: 29, hobbies: [{..}] }}, {upsert: true})
+				//result on:
+					{_id: ObjectId(...), name: 'Maria', age: 29, hobbies: [{..}]}
+				//if the filter is an equality, mongodb will implicitly add the filter as field
+
+		Updating Arrays:
+			Updating the first matched Array element (with $):
+				db.users.updateMany(
+					{ hobbies: {$elemMatch: {title: 'Sports', frequency: {$gte: 3}}} },
+					{$set: {'hobbies.$.newFieldInTheArray': true}}
+				)
+
+			Updating All Array Elements (with $[]):
+				db.users.updateMany({totalAge: {$gt: 30}}, 
+					{$inc: {"hobbies.$[].frequency": 2}}
+				)
+
+			Updating Array items based on a specific condition:
+				db.users.updateMany(
+					{age: {$gt: 30}},
+					{$set: {'hobbies.$[item].newField': true}},
+					{arrayFilters: [{'item.frequency': {$gt: 2}}]}
+				)
+
+			$push (adding elements to arrays):
+				db.users.updateOne({name: 'Maria'}, {$push: {hobbies: {title: 'Fashion'}}})
+
+				db.users.updateOne({name: 'Maria'}, 
+					{$push: {hobbies: { 
+						$each: [{title: 'Manga', frequency: 4}, {title: 'Game', frequency: 6}], 
+						$sort: {frequency: -1}, 
+						$slice: 2
+					}}
+				})
+
+			$pull & $pop (removing elements from arrays):
+				db.users.updateOne({name: 'Maria'}, {$pull: {hobbies: {title: 'Hiking'}}})
+
+				db.users.updateOne({name: 'Maria'}, {$pop: {hobbies: 1}})
+					// 1 to remove the last item, -1 for the first item of the array
+
+			$addToSet (to don't add duplicate values):
+				db.users.updateOne({name: 'Maria'}, {$addToSet: {hobbies: {title: 'Hiking'}}})
+
+
+	DELETE:
+		deleteOne(), deleteMany():
+			db.users.deleteOne({name: 'Chris'})
+
+			db.users.deleteMany({totalAge: {$exists: false, $ne: null}})
+
+		deleting all docs in a collection:
+			db.users.deleteMany({})
+				or
+			db.users.drop()
+		
+		deleting a database:
+			db.dropDatabase()
+
+
+INDEXES:
+	Why Indexes ?
+		WITH NO INDEX: 
+			mongodb makes a COLLSCAN, means that it scans ALL documents then filter
+		WITH INDEX: 
+			mongodb looks at the ordered index of the particular field, 
+				and then directly 'jump' to filtered documents
+
+	Index Restrictions:
+		if you have a query that will return a large portion or the majority of the documents
+		 	a query on an index, as the index add an extra step for retrieving data
+		 		it will make the execution slower
+
+	Adding a single field index:
+		mongoimport persons.json -d contactData -c contacts --jsonArray
+		mongo:
+			use contactData
+			db.contacts.explain().find({"dob.age": {$gt: 60}})
+			db.contacts.explain( 'executionStats' ).find({"dob.age": {$gt: 60}})
+
+			db.contacts.createIndex( {'dob.age': 1} ) //1 for ASC, -1 for DESC
+			db.contacts.dropIndex( {'dob.age': 1} )
+
+	Compound Indexes:
+		we can have a compound index, up to 31 elements
+			db.contacts.createIndex( {'dob.age': 1, gender: 'male'} )
+
+		as we can only utilize a compound index from left to right
+			db.contacts.explain().find( {'dob.age': 35, gender: 'male'} ) 
+			db.contacts.explain().find( {gender: 'male', 'dob.age': 35} )
+				//no matter the order in the filer
+					will use IXSCAN with generated index 'dob.age_1_gender_1'
+			
+			db.contacts.explain().find( {'dob.age': 35} )
+				//will also use the 'dob.age_1_gender_1'
+			
+			db.contacts.explain().find( {gender: 'male'} )
+				//will not use the compound index but the COLLSCAN
+
+	Indexes for Sorting:
+		db.contacts.explain().find({'dob.age': 35}).sort({name: 1})
+
+		to know:
+			if you're not using indexes and you do a sort on a large amount of documents
+				you can actually timeout as mongodb has a limit of 32MB in memory for sorting
+					so having an index in this case can be helpful
+				
+	the Default Index:
+		mongodb maintains automatically a default index based on the _id field
+			db.contacts.getIndexes() //to get the list of all indexes
+
+	Configuring Unique Indexes:
+		db.contacts.createIndex( {email: 1}, {unique: true} )
+			side not: the _id index is by default unique
+
+	Partial Filters:
+		db.contacts.createIndex( {'dob.age': 1}, {partialFilterExpression: {'dob.age': {$gt: 30}}} )
+		
+		db.contacts.createIndex( {'dob.age': 1}, {partialFilterExpression: {gender: 'male'}} )
+			db.contacts.find({'dob.age': 35}).count() //will use COLLSCAN
+			db.contacts.find({'dob.age': 35, gender: 'male'}).count() //will use the IXSCAN
+
+		TO KNOW:
+			if you have documents with no values for an indexed field and that index is unique,
+				mongodb will throw a duplicate key error when trying to add the second document
+			so if per example, our app authorize no values on email,
+				but we still want unique index on it, we can apply partial filter to match that usecase
+
+					db.contacts.createIndex({'email': 1}, {partialFilterExpression: {$exists: true}})
+
+ 	the Time-To-Live(TTL) Index:
+ 		it can only be used on single field indexes, 
+ 			and only indexes of type 'date/time/timestamp'
+ 		
+ 		it's only after an element is inserted that the time-to-live will be applied
+ 			and then all the documents in the collection get destroyed
+
+ 		mongo:
+ 			db.sessions.insertOne({data: 'skdsj', createdAt: new Date()})
+			db.sessions.createIndex({createdAt: 1}, {expireAfterSeconds: 20})
+
+	Query Diagnosis:
+		explain() == explain('queryPlanner') : show summary for executed query + winning plan
+		explain('executionStats') : as previous + possibly rejected plans
+		explain('allPlansExecution') : as the first + winning plan decision process
+
+	Covered Queries:
+		a query is covered when informations for answering that query is all in the index file
+
+		mongo:
+			db.customers.insertMany([{name: 'Max', salary: 3000}, {name: 'Ali', salary: 4000}])
+			db.createIndex({name: 1})
+			db.customers.find({name: 'Max'}, {_id: 0, name: 1}) //is a covered query
+
+	How mongoDB rejects a plan:
+		db.customers.insertMany([{name: 'Max', age: 30}, {name: 'Ali', age: 35}])
+		db.createIndex({name: 1})
+		db.createIndex({age: 1, name: 1})
+
+		db.customers.explain().find({name: 'Max', age: 30})
+			//on this query, mongoDB will consider the two indexes that we created,
+				will make this two approches race against each other by setting a winning condition
+					so per example, will look who will be the first to find 100 documents
+						so then choose the fastest
+
+			as it will cost a bit of performance to make this kind of race, everytime we make a query,
+				mongodb will cache the winning plan of the query that you just send,
+					then for future plan that looks different it will of course race again
+
+			notice also, that instead of being stored forever, this winning plan is removed
+				after you reach a certain write limit to that collection (currently 1000 documents)
+					the same happens if the index is rebuilt
+						also when other indexes are added or removed
+							and finally when the mongoDB server is restarted
+
+	Multi-Key Indexes:
+		it's all about that index are possible on arrays,
+			but know that mongodb store each items in a array as a single value in the index list
+
+		mongo:
+			db.test.insertOne({
+				name: 'Max', 
+				hobbies: ['Cooking', 'Sports'],
+				addresses: [{street: 'Main'}, {street: 'Second'}]
+			})
+			db.test.createdIndex({hobbies: 1})
+			db.test.explain().find({hobbies: 'Sports'}) 
+				//will use IXCAN on the 'hobbies' multi-key index
+
+			db.test.createdIndex({addresses: 1})
+			db.test.explain().find({ 'addresses.street': 'Main' }) //will use COLLSCAN
+			db.test.explain().find({ addresses: {street: 'Main'} }) 
+				//will then use the IXCAN on the 'addresses_1' multi-key index
+
+			db.test.createdIndex({"addresses.street": 1})
+			db.test.explain().find({ 'addresses.street': 'Main' })
+				//will then use IXSCAN but on the 'addresses.street_1' also multi-key index
+
+			restrictions:
+				it's not possible to have more than 1 multi-key index in a compound index:
+					db.test.createdIndex({name: 1, hobbies: 1}) //POSSIBLE
+					db.test.createdIndex({addresses: 1, hobbies: 1}) //ERROR
+
+	Text Indexes:
+		nb: 
+			- we can only have one text index per collection
+			- 'This product is a must-buy for all fans of modern fiction!'
+				in mongodb, a text index will turn this string in an array of keyword:
+					['product', 'must', 'buy', 'fans', 'modern', 'fiction']
+
+		mongo:
+			db.products.insertMany([
+				{title: 'A Book', description: 'This is an awesome book about a young artist!'},
+				{title: 'Red T-Shirt', description: "This t-shirt is red and it's pretty awesome!"},
+				{title: 'A Ship', description: ''}
+			])
+
+			db.products.createIndex({description: 1})
+				//will not create a text index but a normal index on the whole value of 'description'
+			db.products.createIndex({'description_1'})
+
+			db.products.createIndex({ description: 'text' }) //will then create a text index
+			db.products.find({ $text: {$search: 'book'} }).pretty()
+
+			db.products.find({ $text: {$search: 'red book'} }).pretty()
+				//will search everywhere 'red' is specified and everywhere 'book' is in
+
+			db.products.find({ $text: {$search: "\"red book\""} }).pretty() //OR
+			db.products.find({ $text: {$search: '\"red book\"'} }).pretty()
+			db.products.find({ $text: {$search: '\"pretty awesome\"'} }).pretty()
+				//will search for the entire phrase match
+
+		Sorting Results in Text Indexes:
+			db.products.find(
+				{$text: {$search: 'awesome t-shirt'}}, 
+				{score: {$meta: 'textScore'}}
+			).sort({score: {$meta: 'textScore'}}).pretty() //sort is optional
+
+		Creating Combined Text Indexes:
+			db.products.dropIndex('description_text')
+			db.products.createIndex({title: 'text', description: 'text'}) //combined text indexes
+			db.products.find({$text: {$search: 'ship'}})
+
+		Search by Excluding Words:
+			db.products.find({ $text: {$search: 'awesome -book'} }).pretty()
+
+		Setting the Default Language & Using Weights:
+			db.products.dropIndex('title_text_description_text')
+
+			db.products.createIndex(
+				{title: 'text', description: 'text'},
+				{ default_language: 'english', weights: {title: 1, description: 10} }
+			)
+			db.products.find({$text: { $search: '<..>', $caseSensitive: true, $language: 'english' }})
+			db.products.find({$text: {$search: 'red'}}, {score: {$meta: 'textScore'}})
+
+		Building(Adding) Indexes:
+			two ways:
+				in foreground: where the collection is locked during index creation --> faster creation
+				in background: where the collection is accessible during index creation --> slower
+
+			mongo:
+				mongo credit-rating.js //yes the mongo shell can run javascript script
+					use credit
+					db.ratings.createIndex({age: 1}) --> foreground creation
+					db.ratings.createIndex({age: 1}, {background: true}) --> background creation
+
+	Helpful Articles/ Docs:
+		More on partialFilterExpressions: 
+			https://docs.mongodb.com/manual/core/index-partial/
+		Supported default_languages: 
+			https://docs.mongodb.com/manual/reference/text-search-languages/#text-search-languages
+		How to use different languages in the same index: 
+			https://docs.mongodb.com/manual/tutorial/specify-language-for-text-index/#create-a-text-index-for-a-collection-in-multiple-languages
+
+
+GEOSPATIAL DATA:
+	Adding GeoJSON Data (a 'Point' here):
+		use awesomeplaces
+		db.places.insertOne({
+			name: 'California Academy of Sciences',
+			location: {type: 'Point', coordinates: [-122.46636, 37.77014]} //coordinates:[lon, lat]
+		})
+
+	Adding a Geospatial Index:
+		db.places.createIndex( {location: '2dsphere'} )
+
+	$near:
+		//find all the points in our collection that are between 10 and 500 meters near to us
+			db.places.find({ 
+				location: {$near: {
+					$geometry: {type: 'Point', coordinates: [-122.4724356, 37.7672544]}
+					$maxDistance: 500,
+					$minDistance: 10
+			}}}).pretty() 
+
+	Finding Places Inside a Certain Area/Polygon ($geoWithin):
+		db.places.insertMany([
+			{ name: 'C-Flowers ', location: {type: 'Point', coordinates: [-122.4615748, 37.7701756]} },
+			{ name: 'Tennis Park', location: {type: 'Point', coordinates: [-122.4593702, 37.7705056]} }
+			{ name: 'Nopa', location: {type: 'Point', coordinates: [-122.4389058, 37.7747415]} }
+		])
+
+		const p1 = [-122.4547, 37.77413]
+		const p2 = [-122.45303, 37.76641]
+		const p1 = [-122.51026, 37.76411]
+		const p1 = [-122.51088, 37.77131]
+
+		db.places.find({location: { 
+			$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[ p1,p2,p3,p4,p1 ]] }} 
+		}}).pretty()
+
+	Finding Out If a User is inside a Specific Area ($geoIntersects)
+		db.areas.insertOne({
+			name: 'Golden State Park',
+			area: {type: 'Polygon', coordinates: [[ p1,p2,p3,p4,p1 ]] }
+		})
+		db.areas.createIndex({area: '2dsphere'})
+
+		db.areas.find({area: {$geoIntersects: 
+			{$geometry: {type: 'Point', coordinates: [-122.49089, 37.76992]}}
+		}})
+
+	Finding Places Within a Certain Radius:
+		db.places.find({location: {
+			$geoWithin: {$centerSphere: [ [-122.46203, 37.77286], 1/6378.1 ]}
+		}}).pretty()
+			// 1/6378.1 means 1kilometer will give ? radius
+
+
+the Aggregation Framework:
+	the aggregation framework is all about Pipelines, Stages and Operators:
+	 	a pipeline is a set of stages or just one stage
+	 	
+	 	stages define the different steps through data is funneled
+	 		each stage receives the output of the last stage as input
+	 			instead of the first stage which directly data from the collection
+	 	the most used stages are usually $match, $group, $project, $sort, $unwind...
+
+	 	operators are used inside of stages to transform, limit or re-calculate data
+
+	$match, $group:
+ 		mongoimport persons.json -d analytics -c persons --jsonArray
+
+	 	db.persons.aggregate([
+	 		{ $match: {gender: 'female'} },
+	 		{ $group: {_id: {state: '$location.state'}, totalPersons: {$sum: 1}} }
+	 		{ $sort: {totalPersons: -1} }
+	 	]).pretty()
+
+	$project:
+	 	db.persons.aggregate([
+	 		{ $project: {
+	 			_id: 0, email: 1,
+	 			fullName: { $concat: [
+	 				{$toUpper: {$substrCP: ['$name.first', 0, 1]}},
+	 				{$substrCP: ['$name.first', 1, {$subtract: [{$strLenCP: '$name.first'}, 1]}]},
+	 				' ',
+	 				{$toUpper: {$substrCP: ['$name.second', 0, 1]}},
+	 				{$substrCP: ['$name.second',1,{$subtract: [{$strLenCP: '$name.second'}, 1]}]}
+	 			]}
+	 		}}
+	 	]).pretty()
+
+	$toDate, $isoWeekYear:
+	 	db.persons.aggregate([
+	 		{ $project: { _id: 0, birthdate: {$toDate: '$dob.date'} }},
+	 		{ $group: { _id: {birthYear: {$isoWeekYear: '$birthdate'}}, numPersons: {$sum: 1} }},
+	 		{ $sort: { numPersons: -1 } }
+	 	])
+
+	ARRAYS:
+		$push:
+			mongoimport friends.json -d arrays -c friends --jsonArray
+			db.friends.aggregate([
+				{ $group: {_id: {age: '$age', allHobbies: {$push: '$hobbies'}}} }
+			])
+
+		$unwind, $addToSet:
+			db.friends.aggregate([
+				{ $unwind: '$hobbies' },
+				{ $group: {_id: {age: '$age', allHobbies: {$addToSet: '$hobbies'}}}}
+			])
+
+		$project, $slice:
+			db.friends.aggregate([
+				{$project: { _id: 0, examScore: {$slice: ['$examScores', 1]} }}
+			]) //to take the first item in the 'examScores' array
+
+			db.friends.aggregate([
+				{$project: { _id: 0, examScore: {$slice: ['$examScores', 1]} }}
+			]) // to take the latest item
+
+			db.friends.aggregate([
+				{$project: { _id: 0, examScore: {$slice: ['$examScores', 1, 2]} }}
+			]) //take two items from the index/postion '1' included of the array
+
+		$size:
+			db.friends.aggregate([
+				{$project: { _id: 0, numberOfScore: {$size: '$examScores'} }}
+			]).pretty()
+
+		$filter:
+			db.friends.aggregate([
+				{$project: 
+					{scores: { 
+						$filter: { 
+							input: '$examScores', as: 'sc', cond: {$gt: ['$$sc.score', 60]} 
+						}}
+					}
+				}
+			])
+
+		example: retrieve the max score per array
+			db.friends.aggregate([
+				{$unwind: '$examScores'},
+				{$project: {_id: 0, name: 1, score: '$examScores.score'}},
+				{$sort: {score: -1}},
+				{$group: { _id: '$id', name: {$first: '$name'}, maxScore: {$max: '$score'} }}
+				{$sort: {maxScore: -1}}
+			])
+
+	$bucket, $bucketAuto:
+		db.persons.aggregate([
+			{$bucket: {
+				groupBy: '$dob.age',
+				boundaries: [18, 30, 40, 50, 60, 100],
+				output: {
+					numPersons: {$sum: 1},
+					averageAge: {$avg: '$dob.age'}
+				}
+			}}
+		]).pretty()
+
+		db.persons.aggregate([
+			{$bucketAuto: {
+				groupBy: '$dob.age'
+				buckets: 5,
+				output: {numPersons: {$sum: 1},averageAge: {$avg: '$dob.age'}}
+			}}
+		]).pretty()
+
+	GeoJSON ($convert, $toDouble, $geoNear):
+	 	db.persons.aggregate([
+	 		{ $project: {
+	 			_id: 0, age: 1, gender: 1, 'name.first': 1,
+	 			location: {
+ 					type: 'Point', 
+ 					coordinates: [
+	 					{$convert: {
+	 						input: '$location.coordinates.longitude', 
+	 						to: 'double', 
+	 						onError: 0.0, 
+	 						onNull: 0.0
+	 					}}, 
+	 					{$toDouble: '$location.coordinates.latitude'}
+ 					]
+ 				}
+	 		}},
+	 		{ $out: 'transformedPersons' }
+	 	])
+
+	 	db.transformedPersons.aggregate([
+	 		{ $geoNear: {
+	 			near: {type: 'Point', coordinates: [-18.4, -42.8]},
+	 			maxDistance: 1000000,
+	 			num: 10, 	//act like $limit
+	 			query: { age: {$gt: 30} }, 		//act like $match
+	 			distanceField: 'distanceBetween'
+	 		}}
+	 	])
+
+	example:
+		db.persons.aggregate([
+			{ $match: { gender: 'female' } },
+			{ $project: {
+				_id: 0, 
+				name: {$concat: ['$name.first', '', '$name.second']}, 
+				birthdate: {$toDate: '$dob.date'} 
+			}},
+			{ $sort: {birthdate: 1} },
+			{ $skip: 10 },
+			{ $limit: 10 }
+		])
+
+
+Numeric Data:
+	Numbers Types:
+		Integers (int32):
+			-2,147,483,648 <--> 2,147,483,647
+		Longs (int64):
+			-9,223,372,036,854,775,808 <--> 9,223,372,036,854,775,808 
+
+		Doubles (64bit):
+			decimal values are approximated
+		'High Precision Doubles' (128bit):
+			decimal values are stored with high precision (34 decimal digits)
+
+	Understanding Programming Language Defaults
+		when using the mongo shell (because it's based on JS)
+			numbers get stored as 64-bit double by default
+
+		but per example, python makes difference between int & float
+			and store int as int32
+				for int64, it's about using Int64() constructor provider by the python driver..
+
+	Working with int32:
+		db.persons.insertOne({ age: NumberInt("40") })
+	Working with int64:
+		db.companies.insertOne({ valuation: NumberLong("70000000000000") })
+
+	Doing Maths with int32 & int64:
+		we don't store numbers as string as string don't have size limitations 
+			because usually we have to do some calculations on these numbers
+
+		remind also that in the shell when you pass a number whitout any constructor,
+			it is by default a 64-bit double,
+				and if add to an int32, it will convert it to a 64-bit double too,
+					so always convert number if to the same type
+			so then per example, always pass a string to these Number.. construtor
+
+		db.persons.insertOne({ age: NumberInt("22") })	
+		db.persons.updateOne({ age: NumberInt('1') })
+
+		db.companies.insertOne({ valuation: NumberLong("90000000000000") })
+		db.companies.updateOne({}, {$inc: {valuation: NumberLong("3")}})
+
+	What's wrong with Normal Doubles:
+		db.science.insertOne({a: 0.3, b: 0.1})
+		db.science.aggregate([ {$project: {result: {$substract: ['$a', '$b']}}} ])
+			//result: 0.19999999999999998 --> an imprecise result
+
+	Working with 128-bit Decimals:
+		db.science.deleteMany({})
+
+		db.science.insertOne({a: NumberDecimal('0.3'), b: NumberDecimal('0.1')})
+		db.science.aggregate([ {$project: {result: {$substract: ['$a', '$b']}}} ])
+			//will then give us: {result: 0.2}
+
+		db.science.updateOne({}, {$inc: {a: NumberDecimal('0.2')}})
+
+
+MongoDB & Security:
+	MongoDB Security Checklist:
+		Authentication & Authorization
+		
+		Transport Encryption: means that data sent from an app to the db, should be encrypted
+		
+		Encryption at Rest: is all about encrypting database file content, so database side
+		
+		Auditing
+		
+		Server & Network Config and Setup: is all about making the host local network secure
+		
+		Backups & Software Updates: is also a must
+
+	Authentication & Authorization:
+		Authentication: is all about identifying VALID USERS OF THE DATABASE
+		Authorization: is all about identifying WHAT THESE USERS MAY ACTUALLY DO IN THE DATABASE
+
+		the authentication sytem used by mongoDB:
+			mongoDB employs a ROLE BASED ACCESS CONTROL system:
+				in mongodb a user is not only made of username+password but also ROLES
+					these roles are essentially groups of privileges
+						a privilege is a combination of ressources and actions
+							a ressource could be a 'Products' collection in our 'shops' database
+							an action would be an 'insertOne()'' command  
+
+	Why roles ?
+		simply to have different types of database users, like:
+			Administrator:
+				who needs to be able to manage the database config, create users...
+				but does usually not need to fetch or insert data
+			
+			the Developper (your App):
+				who needs him to be able to make CRUD operations
+				but don't need to do admin task such as creating users, managing the database config..
+			
+			a Data Scientist: where a data scientist certainly only needs to be able to fetch data
+
+	Creating a User:
+		mongod --auth
+
+		the localhost exception:
+			when we enable auth first time, 
+				when connecting to our db in this state where there is no user,
+					we are allowed to create one user, so let's create one
+
+		mongo
+			use admin
+			db.createUser({ user: 'oumar', pwd: 'barry', roles: ['root'] })
+			db.auth('oumar', 'barry')
+
+	Built-in Roles:
+		database user: read, readWrite
+		
+		database admin: dbAdmin, userAdmin, dbOwner
+		
+		all database: readAnyDatabase, readWriteAnyDatabase, dbAdminAnyDatabase, userAdminAnyDatabase
+		
+		backup/restore: backup, restore
+		
+		cluster admin: clusterManager, clusterMonitor, hostManager, clusterAdmin
+		
+		superuser: dbOwner/userAdmin (of the 'admin' db), userAdminAnyDatabase, root 
+
+	Assigning Roles to Users at a certain database:
+		mongo -u oumar -p barry --authenticationDatabase admin
+			use shop
+			db.createUser({ user: 'chopper', pwd: 'robin', roles: ['readWrite']})
+			
+			use admin
+			db.logout()
+			
+			use shop
+			db.auth('chopper', 'robin')
+			db.insertOne({name: 'A Book'})
+
+	Updating & Extending Roles to Other Databases:
+		use shop
+		db.logout()
+		
+		use admin
+		db.auth('oumar', 'barry')
+		
+		use shop
+		db.updateUser('chopper', {pwd: 'sun', roles: ['readWrite', {role: 'readWrite', db: 'post'}]})
+		db.getUser('chopper')
+
+		use admin
+		db.logout()
+
+		use shop
+		db.auth('chopper', 'sunny')
+		use blog
+		db.posts.insertOne({title: 'It works'})
+
+	Adding SSL for Transport Encryption:
+		cd /etc/ssl
+		openssl req -newkey rsa:2048 -new -x509 -days 365 -nodes /
+			-out mongodb-cert.crt -keyout mongodb-cert.key
+				Common Name: localhost  //or your mongodb webserver full quality domain name
+
+		cat mongodb-cert.key mongodb-cert.crt > mongodb.pem
+
+		mongod --help
+		mongod --sslMod arg --sslPEMKeyFile arg --sslCAFile arg
+			for local development test, we may missing a CA (Certificate Authority file)
+				but in production it is a must,
+					if we get our SSL certificate through an official authority (free/paid)
+						we will get both PEM and CA file, 
+						
+		mongod --sslMod requireSSL --sslPEMKeyFile mongodb.pem --sslCAFile <..>
+
+		mongo --ssl --sslPEMKeyFile mongodb.pem --sslCAFile <..> --host localhost
+
+	Encryption at Rest:
+		we can encrypt both the files that hold the data (made simple with 'MongoDB Enterprise')
+			and the values inside documents (like with a hashed password)
+
+
+Performance, Fault Tolerance & Deployment:
+	What influences performance:
+		as developper/dbadmin:
+			efficient queries/operations, well using of indexes, having a useful data schema
+		as dbadmin/sysadmin:
+			hardware & network, sharding, replica sets
+
+	Capped Collection:
+		it's a special type of collection which must be create explicitly
+			where you limit the amount of data/documents that can be stored
+				and where old docs will simply be deleted when the size is exceeded
+
+		mongo:
+			use performanceDB
+			db.createCollection('test', {capped: true}) //the default size limit is 4bytes
+			db.createCollection('kappa', {capped: true, size: 10000, max: 3})
+				this will create the kappa collection 
+					with the size limit of 10000*256bytes and with max 3 documents that can be added
+
+			with capped collection, the order in which we retrieve documents 
+				is always the order in which they were inserted
+					for a normal collection, it's not guaranteed
+
+			so for reversing the order of the sort in a capped collection:
+				db.kappa.insertMany([{name: 'A'}, {name: 'B'}, {name: 'C'}])
+				db.kappa.find().sort({$natural: -1}).pretty()
+
+			finally, when we add a new document, the oldest gets deleted, here 'A':
+				db.kappa.insertOne({name: 'D'})
+
+	Replica Sets:
+		by default, in a self-managed mongodb server installion,
+			where this is installed represent one node, the primary node
+			so we can add so-called secondary nodes in our mongodb environment
+				to create so a replica-set (primary node + secondary1 + secondaryN...)
+
+		so when a client send per example a write operation, 
+			we send that to the mongodb server, which in end talks automatically to the primary node
+				and behind the scenes, 
+					this primary node will asynchronously replicate the data on the secondary nodes
+
+		if we read data and for some reason, the primary node goes offline,
+			we can reach out to a secondary node that will elected as the new primary node
+				until our entire replica sets is restored
+					so we get some FAULT TOLERANCY (BACKUP) here, 
+						as if one of our servers goes down, 
+							we can talk to another node to still read data
+								and as it becomes the primary node, 
+									we can also write data directly to it
+					
+		(aside note is that the write will always be managed by the primary node)
+			but we can also configure the mongodb server 
+				to automatically distribute incoming READ requests across all nodes
+					what's will highly IMPROVE READ PERFORMANCE
+
+	Sharding (Horizontal Scaling):
+		with sharding, we also have multiple computers who all run mongodb servers,
+			but these servers don't work standalone 
+				but work together and split up the available data between these shards
+		
+		in resume, with sharding, data is distributed (not replicated) across shards(nodes)
+
+		How sharding works:
+			Client -> mongos (Router) -> MongoDB Server / Shard (+ Shard Key)
+				the router is responsible for forwarding operations to the right shards
+					so for finding out the right shards, mongos refers to the given shard key
+
+				a shard key is simply a field ( in a document
+					a field is customizable, per example for your 'users' collection,
+						you can choose the 'username' field as shard key
+
+		Queries & Sharding:
+			Option 1: the operation does not contain shard key
+				in this case, the query is run/broadcast accross all shards
+			Option 2: the operation does contain shard key
+				the query is so directly send to the right shard
+
+	Deployment with MongoDB ATLAS:
+		deploying a mongoDB server self-managed by yourself will require so lot managements:
+			secure auth setup, encryption(at transportation & rest), protecting network/web server,
+				manage shards, manage replica sets, regular backups, update software and so on
+
+		MongoDB Atlas is a Managed Solution that fullfill all that requirements:
+			Using MongoDB Atlas:
+				Create an Account -> Create a Cluster -> Create Users -> Add Ip Whitelist...
+
+			Backups & Setting Alerts in MongoDB Atlas
+
+			Connecting to our Atlas Cluster	with the Mongo Shell:
+				a cluster simply describe a mongodb environment
+					a cluster contains all the shards, all the replica sets
+
+				mongo "<given_url_to_the_cluster>" --username <name>
+				mongo "mongodb+srv://cluster0-oumar.mongodb.net" --username oumar
+
+
+Transactions:
+	transactions or how to make two or more operations, succeed or fail together
+		operations that may be deleting two related documents in different collection, 
+			or inserting 3 documents in a collection, etc
+	
+	we need a replica set environment for transactions to work
+
+	how does a transaction work ?
+		use blog
+		db.users.insertOne({_id: 'max', name: 'Max'})
+		db.posts.insertMany([{title: 'First', userId: 'max'}, {title: 'Second', userId: 'max'}])
+
+		const session = db.getMongo().startSession()
+		const usersColl = session.getDatabase('blog').users
+		const postsColl = session.getDatabase('blog').posts
+
+		session.startTransaction()
+		usersColl.deleteOne({_id: 'max'})
+		postsColl.deleteMany({userId: 'max'})
+
+		session.commitTransaction() 
+			//we may also use session.abortTransaction() to abort the transaction
+
+		db.users.find()
+			//everything get deleted, 
+				if during the transaction the server shudown, 
+					it will rollback the documents in their respective collection
+
+
+From Shell to Drivers:
+	Splitting Work:
+		shell: is usually for Configuring database, creating Collections/Indexes/Users
+		drivers: for CRUD operations, Aggregation Pipelines
+	CRUD, Signin & Signup
+	
+
+Stitch --> now Realm:
+	Realm is the Serverless Platform Solution of MongoDB for Building Applications like Firebase.
+		so it packages:
+			access to atlas database,
+			authentication,
+			triggers,
+			cloud functions,
+			file storage,
+			mongoDB mobile,
+			and also access to other services like amazon-aws-s3
+
+
+Roundup:
+	Pratice, Pratice, Practice:
+		Use the Shell as a Playground
+		Build Demo Apps that use MongoDB, Atlas, Realm
+
+	Ressources:
+		the Official Docs
+		StackOverflow, Blog Posts, Google, Youtube, Other Courses to learn about specific topics
+
